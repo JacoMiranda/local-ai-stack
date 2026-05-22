@@ -1,0 +1,123 @@
+{
+  "name": "Chat Simples com vLLM Local",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "d05eb4db-1e3e-46bd-85c1-e77242d5f812",
+      "name": "When clicking ‘Test workflow’",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        180,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "pergunta",
+              "value": "Fale sobre buracos negros de forma muito breve e simples."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f5edfb19-21cb-4034-be57-9cc1f5e27a6f",
+      "name": "Definir Pergunta",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        400,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://vllm:8000/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"qwen\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"{{ $json.pergunta }}\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "8e36e67e-afec-4f81-af75-7e04f4b9da85",
+      "name": "HTTP Request (vLLM)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        620,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "resposta_ia",
+              "value": "={{ $json.body.choices[0].message.content }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "119e7e7f-b677-4c3e-adcc-3ed8627bcbc3",
+      "name": "Extrair Resposta",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        840,
+        240
+      ]
+    }
+  ],
+  "connections": {
+    "When clicking ‘Test workflow’": {
+      "main": [
+        [
+          {
+            "node": "Definir Pergunta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Definir Pergunta": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request (vLLM)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request (vLLM)": {
+      "main": [
+        [
+          {
+            "node": "Extrair Resposta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "versionId": "c005fbc0-9dfd-495c-9c04-f58c75d4a6ec"
+}
