@@ -16,6 +16,7 @@ Este guia cobre os erros mais comuns encontrados ao rodar a stack, incluindo os 
 8. [OpenWebUI não conecta no vLLM](#erro-8-openwebui-não-conecta-no-vllm)
 9. [docker: Cannot connect to the Docker daemon](#erro-9-docker-cannot-connect-to-the-docker-daemon)
 10. [WSL: pin_memory=False warning](#erro-10-wsl-pin_memoryfalse-warning)
+11. [Crash na segunda interação — prefix caching + Triton CC 7.5](#erro-11-crash-na-segunda-interação--prefix-caching--triton-cc-75)
 
 ---
 
@@ -307,3 +308,37 @@ docker compose down && docker compose up -d
 # Reiniciar e apagar TUDO (inclusive modelos baixados)
 docker compose down -v && docker compose up -d
 ```
+
+---
+
+## Erro 11: Crash na segunda interação — prefix caching + Triton CC 7.5
+
+**Sintoma:**
+- Primeira mensagem no OpenWebUI funciona normalmente
+- A segunda mensagem trava e retorna erro — o vLLM encerra o servidor
+
+**Nos logs:**
+```
+prefix_prefill.py:36:0: error: Failures have been detected while processing an MLIR pass pipeline
+Pipeline failed while executing [ConvertTritonGPUToLLVM ... compute-capability=75]
+INFO:     Shutting down
+INFO:     Application shutdown complete.
+```
+
+**Causa:**
+`--enable-prefix-caching` usa um kernel Triton customizado (`prefix_prefill.py`) compilado via MLIR na GPU. Esse kernel é invocado na **segunda** interação (quando há contexto anterior para reusar). O compilador Triton falha ao gerar código LLVM para GPUs com Compute Capability < 8.0 (Turing/Volta).
+
+**Solução:**
+Remova `--enable-prefix-caching` do `command:` no `docker-compose.yml`:
+
+```yaml
+# ❌ REMOVER em GPUs CC < 8.0 (RTX 20xx e anteriores)
+--enable-prefix-caching
+```
+
+**Impacto de remover:**
+Pequena perda de performance quando há system prompts longos repetidos entre requests. Para uso conversacional normal, impacto é zero.
+
+**Quando é seguro usar:**
+Apenas em GPUs Ampere (RTX 30xx) ou mais recentes (Compute Capability ≥ 8.0).
+
