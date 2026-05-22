@@ -70,6 +70,7 @@ services:
       --max-num-batched-tokens 3072
       --tensor-parallel-size 1
       --enforce-eager
+      --generation-config vllm
 
     # Verificação de saúde: só sobe dependências quando a API responder 200
     healthcheck:
