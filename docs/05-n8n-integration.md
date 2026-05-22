@@ -14,50 +14,45 @@ Como o **vLLM** expõe uma API 100% compatível com a da OpenAI, podemos usar os
 
 ---
 
-## 2. Configurando a credencial do vLLM (como se fosse OpenAI)
+## 2. Criando seu primeiro Workflow com IA (via HTTP Request)
 
-Para que o n8n fale com o seu modelo, precisamos criar uma credencial do tipo "OpenAI API" apontando para o servidor local em vez da nuvem.
+Como o n8n atualiza frequentemente seus nós nativos da OpenAI (muitas vezes tentando acessar rotas da API de Assistants como `/v1/responses`), a forma **mais segura e garantida** de usar o vLLM local é através do nó universal **HTTP Request**.
 
-1. No menu esquerdo do n8n, clique em **Credentials**
-2. Clique no botão superior direito **Add Credential**
-3. Busque por **OpenAI** e selecione a opção **OpenAI API**
-4. Configure assim:
-   - **Name:** `vLLM Local API`
-   - **API Key:** `EMPTY` *(o vLLM não valida a chave, mas o n8n exige que o campo não fique vazio)*
-   - **Base URL:** `http://vllm:8000/v1`
-5. Clique em **Save**
+1. Vá em **Workflows** → **Add Workflow**
+2. Adicione um gatilho como o **Manual Trigger** (para rodar manualmente).
+3. Adicione um novo nó e busque por **HTTP Request**.
+4. Configure o nó com os padrões da API OpenAI:
+   - **Method:** `POST`
+   - **URL:** `http://vllm:8000/v1/chat/completions`
+   - **Authentication:** `None` *(não precisamos de token internamente)*
+   - **Send Body:** `ON`
+   - **Body Content Type:** `JSON`
 
-> 💡 **Por que `http://vllm:8000/v1`?**
-> Como o n8n e o vLLM estão na mesma rede do Docker Compose, eles conseguem se encontrar pelo nome do serviço (`vllm`). Não use `localhost` aqui, pois `localhost` dentro do n8n apontaria para o próprio container do n8n.
+5. Na caixa de **JSON / Body Parameters**, cole a estrutura de conversa:
+```json
+{
+  "model": "qwen",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Responda em uma frase: O que é a Teoria da Relatividade?"
+    }
+  ]
+}
+```
 
----
-
-## 3. Criando seu primeiro Workflow com IA
-
-Agora vamos testar a geração de texto.
-
-1. Volte ao menu principal e clique em **Workflows** → **Add Workflow**
-2. Clique no botão de **+** no meio da tela para adicionar o primeiro nó
-3. Busque pelo nó **Manual Trigger** (gatilho para rodar manualmente)
-4. Adicione um novo nó, busque por **OpenAI** e selecione.
-5. Configure o nó OpenAI:
-   - **Resource:** `Chat`
-   - **Operation:** `Generate a Text completion`
-   - **Credential for OpenAI API:** Selecione a credencial que você criou (`vLLM Local API`)
-   - **Model:** O n8n vai carregar a lista de modelos disponíveis direto do vLLM. Selecione `qwen` (ou o modelo que você configurou no `.env`).
-   - **Messages:**
-     - Clique em `Add Message`
-     - Role: `User`
-     - Content: `Responda em uma frase: O que é a Teoria da Relatividade?`
+> 💡 **Nota sobre a URL e Modelo:**
+> Usamos `http://vllm:8000/v1` porque ambos estão na mesma rede do Docker Compose (nome do serviço "vllm"). O `model` no JSON deve bater com o nome carregado no vLLM (padrão do projeto é `qwen`).
 
 ---
 
-## 4. Testando o Workflow
+## 3. Testando e Lendo a Resposta
 
-1. Feche as configurações do nó
-2. Clique no botão inferior **Test Workflow**
-3. O n8n fará uma requisição à API do vLLM. Em poucos segundos, o nó da OpenAI ficará verde.
-4. Clique no nó da OpenAI para ver o resultado — a resposta do modelo estará na aba **Output** (saída).
+1. Clique no botão inferior **Test step**.
+2. O n8n fará uma requisição direta ao seu modelo na GPU.
+3. No painel de **Output** (Saída), você receberá um JSON completo. A resposta do LLM fica sempre no caminho:
+   `body.choices[0].message.content`
+4. Você pode usar um nó **Set** (ou Edit Fields) logo depois para extrair apenas essa variável e passá-la limpa para o próximo passo do seu fluxo!
 
 ---
 
