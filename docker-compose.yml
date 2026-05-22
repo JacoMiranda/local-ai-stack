@@ -1,0 +1,193 @@
+services:
+
+  # ============================================================
+  # SERVIÇO 1: vLLM — Motor de Inferência LLM com GPU
+  # ============================================================
+  # vLLM é o servidor que roda o modelo de linguagem (LLM).
+  # Ele expõe uma API 100% compatível com OpenAI (/v1/chat/completions).
+  # ============================================================
+
+  vllm:
+    # Imagem Docker oficial do vLLM com suporte OpenAI
+    # v0.9.2 = versão pinada para garantir reprodutibilidade
+    # Não use "latest" — pode quebrar com mudanças de API
+    image: vllm/vllm-openai:v0.9.2
+
+    # Nome do container (aparece no "docker ps")
+    container_name: vllm-qwen
+
+    # Reinicia automaticamente se o container cair (exceto se parado manualmente)
+    restart: unless-stopped
+
+    # Reserva acesso à GPU NVIDIA
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia   # Driver NVIDIA (requer NVIDIA Container Toolkit)
+              count: 1         # Usa 1 GPU
+              capabilities: [gpu]  # Habilita suporte CUDA
+
+    environment:
+      # Torna todas as GPUs visíveis para o container
+      - NVIDIA_VISIBLE_DEVICES=all
+
+      # Habilita capacidades de compute e utilitários NVIDIA
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+
+      # Força uso apenas da GPU 0 (primeira GPU)
+      - CUDA_VISIBLE_DEVICES=0
+
+      # Token do HuggingFace — lido do arquivo .env
+      # Necessário para baixar modelos "gated" como Qwen
+      - HF_TOKEN=${HF_TOKEN}
+      - HUGGING_FACE_HUB_TOKEN=${HF_TOKEN}
+
+    # Porta: HOST:CONTAINER
+    # Acesse a API em http://localhost:8000
+    ports:
+      - "8000:8000"
+
+    # Compartilha memória entre processos (necessário para modelos grandes)
+    ipc: host
+
+    volumes:
+      # Cache dos modelos HuggingFace — evita re-download a cada restart
+      # Os arquivos ficam em um volume Docker gerenciado
+      - huggingface:/root/.cache/huggingface
+
+    # Argumentos passados diretamente para api_server.py do vLLM
+    command: >
+      --model ${VLLM_MODEL:-Qwen/Qwen2.5-3B-Instruct-AWQ}
+      --host 0.0.0.0
+      --port 8000
+      --served-model-name ${SERVED_MODEL_NAME:-qwen}
+      --quantization awq
+      --dtype float16
+      --gpu-memory-utilization 0.82
+      --max-model-len 3072
+      --max-num-seqs 16
+      --max-num-batched-tokens 3072
+      --enable-prefix-caching
+      --tensor-parallel-size 1
+      --enforce-eager
+
+    # Verificação de saúde: só sobe dependências quando a API responder 200
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/v1/models"]
+      interval: 30s   # Testa a cada 30 segundos
+      timeout: 10s    # Aguarda até 10s por resposta
+      retries: 10     # Tenta 10 vezes antes de declarar "unhealthy"
+
+  # ============================================================
+  # SERVIÇO 2: SearXNG — Motor de Busca Privado
+  # ============================================================
+  # SearXNG é um meta-buscador open-source e self-hosted.
+  # Agrega resultados do Google, Bing, DuckDuckGo etc. sem rastrear você.
+  # Usado pelo OpenWebUI para busca na web (RAG web search).
+  # ============================================================
+
+  searxng:
+    image: searxng/searxng:latest
+    container_name: searxng
+
+    restart: unless-stopped
+
+    # Porta: acesse em http://localhost:8080 (uso interno pelo OpenWebUI)
+    ports:
+      - "8080:8080"
+
+    volumes:
+      # Configurações do SearXNG (settings.yml, limiter.toml, etc.)
+      - ./searxng:/etc/searxng
+
+  # ============================================================
+  # SERVIÇO 3: Open WebUI — Interface de Chat
+  # ============================================================
+  # Open WebUI é uma interface web estilo ChatGPT que conecta
+  # ao vLLM via API OpenAI-compatível.
+  # Funcionalidades: histórico de conversas, RAG, busca web,
+  # system prompts, múltiplos usuários, etc.
+  # ============================================================
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: open-webui
+
+    restart: unless-stopped
+
+    # Aguarda o vLLM ficar "healthy" antes de iniciar
+    # (evita erros de conexão na inicialização)
+    depends_on:
+      vllm:
+        condition: service_healthy
+
+    # Porta: acesse o chat em http://localhost:3000
+    ports:
+      - "3000:8080"
+
+    environment:
+      # --------------------------------------------------------
+      # Conexão com a API do vLLM (OpenAI-compatible)
+      # --------------------------------------------------------
+      # URL interna (nome do serviço "vllm" resolve via DNS do Docker)
+      - OPENAI_API_BASE_URL=http://vllm:8000/v1
+      # vLLM não exige autenticação por padrão — qualquer valor funciona
+      - OPENAI_API_KEY=EMPTY
+
+      # --------------------------------------------------------
+      # Modelo padrão da interface
+      # --------------------------------------------------------
+      # Deve bater com o --served-model-name do vLLM
+      - DEFAULT_MODELS=${SERVED_MODEL_NAME:-qwen}
+
+      # --------------------------------------------------------
+      # Autenticação
+      # --------------------------------------------------------
+      # True = exige login (recomendado para uso em rede)
+      # False = acesso livre (só para uso local/dev)
+      - WEBUI_AUTH=True
+
+      # --------------------------------------------------------
+      # API OpenAI
+      # --------------------------------------------------------
+      - ENABLE_OPENAI_API=True
+
+      # --------------------------------------------------------
+      # Filtro de modelos
+      # --------------------------------------------------------
+      # False = mostra todos os modelos disponíveis no vLLM
+      - ENABLE_MODEL_FILTER=False
+
+      # --------------------------------------------------------
+      # Busca na Web (RAG Web Search)
+      # --------------------------------------------------------
+      # Habilita busca na web dentro do chat
+      - ENABLE_RAG_WEB_SEARCH=True
+      - RAG_WEB_SEARCH_ENGINE=searxng
+      # URL do SearXNG (nome do serviço resolve via DNS Docker)
+      - SEARXNG_QUERY_URL=http://searxng:8080/search?q=<query>
+
+      # Evita problemas com Cloudflare ao carregar páginas via RAG
+      - BYPASS_WEB_SEARCH_WEB_LOADER=True
+
+      # User-Agent para requests HTTP do RAG (evita bloqueios)
+      - USER_AGENT=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36
+
+    # Permite acessar o host a partir do container (ex: APIs locais)
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    volumes:
+      # Dados persistentes: usuários, conversas, configurações
+      - open-webui:/app/backend/data
+
+# ============================================================
+# VOLUMES DOCKER (armazenamento persistente gerenciado)
+# ============================================================
+# Volumes sobrevivem ao "docker compose down"
+# Para limpar tudo: docker compose down -v (APAGA os dados!)
+# ============================================================
+volumes:
+  huggingface:   # Cache dos modelos HuggingFace (~2-15GB dependendo do modelo)
+  open-webui:    # Banco de dados do OpenWebUI (usuários, histórico)

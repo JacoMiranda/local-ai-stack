@@ -1,0 +1,12 @@
+.env
+*.env.local
+hf_cache/
+data/
+models/
+open-webui/
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+Thumbs.db
+*.log
