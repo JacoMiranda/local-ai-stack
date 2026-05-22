@@ -16,6 +16,7 @@ Esse repositório contém uma stack Docker pronta para rodar um **assistente de 
 | **vLLM** | Servidor de inferência LLM com GPU | `8000` |
 | **Open WebUI** | Interface de chat (estilo ChatGPT) | `3000` |
 | **SearXNG** | Busca na web privada (RAG) | `8080` |
+| **n8n** | Automação de Workflows (estilo Zapier) | `5678` |
 
 ### Por que usar isso?
 
@@ -104,6 +105,7 @@ Veja alternativas por GPU em **[docs/03-hardware.md](docs/03-hardware.md)**.
 | [docs/02-docker-compose-explained.md](docs/02-docker-compose-explained.md) | Explicação de cada linha do docker-compose |
 | [docs/03-hardware.md](docs/03-hardware.md) | Configurações por tipo de GPU |
 | [docs/04-troubleshooting.md](docs/04-troubleshooting.md) | Erros comuns e soluções |
+| [docs/05-n8n-integration.md](docs/05-n8n-integration.md) | Guia para integrar automações do n8n com a IA |
 
 ---
 
@@ -117,6 +119,7 @@ Após subir a stack:
 | vLLM API | http://localhost:8000/v1 | API OpenAI-compatible |
 | vLLM Docs | http://localhost:8000/docs | Swagger UI da API |
 | SearXNG | http://localhost:8080 | Motor de busca |
+| n8n | http://localhost:5678 | Automação de Workflows |
 
 ---
 

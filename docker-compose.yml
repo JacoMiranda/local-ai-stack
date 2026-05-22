@@ -182,6 +182,28 @@ services:
       # Dados persistentes: usuários, conversas, configurações
       - open-webui:/app/backend/data
 
+  # ============================================================
+  # SERVIÇO 4: n8n — Automação de Fluxos de Trabalho
+  # ============================================================
+  # n8n é uma ferramenta de automação workflow open-source.
+  # Pode ser usado para criar fluxos que chamam a API do vLLM.
+  # ============================================================
+  n8n:
+    image: docker.n8n.io/n8nio/n8n
+    container_name: n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - NODE_ENV=production
+      - WEBHOOK_URL=http://localhost:5678/
+      - GENERIC_TIMEZONE=America/Sao_Paulo
+    volumes:
+      - n8n:/home/node/.n8n
+
 # ============================================================
 # VOLUMES DOCKER (armazenamento persistente gerenciado)
 # ============================================================
@@ -191,3 +213,4 @@ services:
 volumes:
   huggingface:   # Cache dos modelos HuggingFace (~2-15GB dependendo do modelo)
   open-webui:    # Banco de dados do OpenWebUI (usuários, histórico)
+  n8n:           # Dados e fluxos do n8n
