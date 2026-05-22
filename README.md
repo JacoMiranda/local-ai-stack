@@ -99,6 +99,7 @@ Veja alternativas por GPU em **[docs/03-hardware.md](docs/03-hardware.md)**.
 
 | Arquivo | Conteúdo |
 |---|---|
+| [DEVLOG.md](DEVLOG.md) | 📓 Diário de bordo — todos os erros e correções do setup real |
 | [docs/01-installation.md](docs/01-installation.md) | Instalação completa do zero |
 | [docs/02-docker-compose-explained.md](docs/02-docker-compose-explained.md) | Explicação de cada linha do docker-compose |
 | [docs/03-hardware.md](docs/03-hardware.md) | Configurações por tipo de GPU |
